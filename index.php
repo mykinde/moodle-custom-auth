@@ -1,112 +1,10 @@
-<?php
-// Database connection
-$host = "localhost";
-$user = "root";
-$pass = "password";
-$dbname = "test_db";
-$port = 3307;
 
-$conn = new mysqli($host, $user, $pass, $dbname, $port);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// Create table if it doesn't exist
-$conn->query("CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    firstname VARCHAR(100),
-    lastname VARCHAR(100),
-    middlename VARCHAR(100),
-    email VARCHAR(150) UNIQUE,
-    password VARCHAR(255),
-    idnumber VARCHAR(11) UNIQUE,
-    department VARCHAR(100),
-    institution VARCHAR(100),
-    phone VARCHAR(50),
-    username VARCHAR(100),
-    secret VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)");
-
-$message = "";
-$message_type = "";
-
-// Initialize persistence variables
-$fields = [
-    'firstname' => '', 'lastname' => '', 'middlename' => '', 'email' => '',
-    'idnumber' => '', 'confirm_id' => '', 'department' => '', 'institution' => '',
-    'phone' => '', 'username' => '', 'secret' => ''
-];
-
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    foreach ($fields as $key => $val) {
-        $fields[$key] = htmlspecialchars(trim($_POST[$key] ?? ''));
-    }
-
-    $password = $_POST['password'] ?? '';
-    $confirm_password = $_POST['confirm_password'] ?? '';
-
-    // Case formatting
-    $fields['firstname']  = ucwords(strtolower($fields['firstname']));
-    $fields['lastname']   = ucwords(strtolower($fields['lastname']));
-    $fields['middlename'] = ucwords(strtolower($fields['middlename']));
-    $fields['email']      = strtolower($fields['email']);
-    $fields['idnumber']   = strtolower($fields['idnumber']);
-    $fields['confirm_id'] = strtolower($fields['confirm_id']);
-
-    // Validation
-    if (!filter_var($fields['email'], FILTER_VALIDATE_EMAIL)) {
-        $message = "Invalid email address.";
-        $message_type = "danger";
-    } elseif (strlen($password) < 6) {
-        $message = "Password must be at least 6 characters.";
-        $message_type = "danger";
-    } elseif ($password !== $confirm_password) {
-        $message = "Passwords do not match.";
-        $message_type = "danger";
-    } elseif (!preg_match('/^[0-9]{7,11}$/', $fields['idnumber'])) {
-        $message = "ID Number must be numeric and max 11 digits.";
-        $message_type = "danger";
-    } elseif ($fields['idnumber'] !== $fields['confirm_id']) {
-        $message = "ID Number confirmation does not match.";
-        $message_type = "danger";
-    } else {
-        $check = $conn->prepare("SELECT id FROM users WHERE email=? OR idnumber=?");
-        $check->bind_param("ss", $fields['email'], $fields['idnumber']);
-        $check->execute();
-        $check->store_result();
-        if ($check->num_rows > 0) {
-            $message = "Email or ID Number already exists.";
-            $message_type = "warning";
-        } else {
-            $hashed = password_hash($password, PASSWORD_DEFAULT);
-            $stmt = $conn->prepare("INSERT INTO users 
-                (firstname, lastname, middlename, email, password, idnumber, department, institution, phone, username, secret)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param(
-                "sssssssssss",
-                $fields['firstname'], $fields['lastname'], $fields['middlename'], $fields['email'],
-                $hashed, $fields['idnumber'], $fields['department'], $fields['institution'],
-                $fields['phone'], $fields['username'], $fields['secret']
-            );
-            if ($stmt->execute()) {
-                $message = "Registration successful! You may now <a href='login.php' class='alert-link fw-bold'>login here</a>.";
-                $message_type = "success";
-                foreach ($fields as $key => $val) $fields[$key] = '';
-            } else {
-                $message = "Registration failed. Please try again.";
-                $message_type = "danger";
-            }
-        }
-    }
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-<title>User Registration | Create Your Account</title>
+<title>Exam Portal | Welcome</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 <style>
@@ -120,26 +18,145 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     --shadow-xl: 0 20px 40px rgba(0,0,0,0.15);
 }
 
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
 body {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     min-height: 100vh;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    padding: 20px 0;
+    overflow-x: hidden;
 }
 
-.registration-container {
-    max-width: 750px;
-    margin: 0 auto;
+/* Navigation */
+.navbar-custom {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow-lg);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    animation: slideDown 0.5s ease-out;
 }
 
-.card-custom {
-    background: #ffffff;
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: 700;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav-link-custom {
+    color: #374151;
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    margin: 0 0.3rem;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.nav-link-custom:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    transform: translateY(-2px);
+}
+
+.nav-link-custom.active {
+    background: var(--primary-gradient);
+    color: white;
+}
+
+/* Hero Section */
+.hero-section {
+    padding: 6rem 0;
+    text-align: center;
+    color: white;
+    animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.hero-title {
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    line-height: 1.2;
+}
+
+.hero-subtitle {
+    font-size: 1.3rem;
+    margin-bottom: 3rem;
+    opacity: 0.95;
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-icon {
+    font-size: 5rem;
+    margin-bottom: 2rem;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+/* Feature Cards */
+.features-section {
+    padding: 4rem 0;
+}
+
+.feature-card {
+    background: white;
     border-radius: 20px;
+    padding: 2.5rem;
     box-shadow: var(--shadow-xl);
+    transition: all 0.4s ease;
     border: none;
-    overflow: hidden;
-    animation: slideUp 0.5s ease-out;
+    height: 100%;
+    animation: slideUp 0.6s ease-out;
+    animation-fill-mode: both;
 }
+
+.feature-card:nth-child(1) { animation-delay: 0.1s; }
+.feature-card:nth-child(2) { animation-delay: 0.2s; }
+.feature-card:nth-child(3) { animation-delay: 0.3s; }
+.feature-card:nth-child(4) { animation-delay: 0.4s; }
+.feature-card:nth-child(5) { animation-delay: 0.5s; }
 
 @keyframes slideUp {
     from {
@@ -152,168 +169,145 @@ body {
     }
 }
 
-.card-header-custom {
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 25px 50px rgba(0,0,0,0.2);
+}
+
+.feature-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
     background: var(--primary-gradient);
     color: white;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    border: none;
-}
-
-.card-header-custom h2 {
-    font-size: 2rem;
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.card-header-custom p {
-    margin: 0;
-    opacity: 0.95;
-    font-size: 1rem;
-}
-
-.card-body-custom {
-    padding: 2.5rem 2rem;
-}
-
-.nav-links {
-    display: flex;
-    gap: 1.5rem;
-    justify-content: center;
-    margin-top: 1rem;
-}
-
-.nav-links a {
-    color: white;
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    padding: 0.4rem 1rem;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.1);
-    backdrop-filter: blur(10px);
-}
-
-.nav-links a:hover {
-    background: rgba(255,255,255,0.2);
-    transform: translateY(-2px);
-}
-
-.form-label {
-    font-weight: 600;
-    color: #374151;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1.5rem auto;
+    box-shadow: var(--shadow-md);
 }
 
-.form-label i {
-    color: #667eea;
-    font-size: 0.85rem;
-}
-
-.form-control, .form-select {
-    border: 2px solid #e5e7eb;
-    border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-size: 0.95rem;
-    transition: all 0.3s ease;
-    background: #f9fafb;
-}
-
-.form-control:focus, .form-select:focus {
-    border-color: #667eea;
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
-    background: white;
-    outline: none;
-}
-
-.form-control:hover, .form-select:hover {
-    border-color: #9ca3af;
-}
-
-.form-section-title {
-    font-size: 1.1rem;
+.feature-title {
+    font-size: 1.5rem;
     font-weight: 700;
     color: #1f2937;
-    margin: 2rem 0 1.5rem 0;
-    padding-bottom: 0.75rem;
-    border-bottom: 3px solid #667eea;
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
+    margin-bottom: 1rem;
 }
 
-.form-section-title i {
-    color: #667eea;
-    font-size: 1.3rem;
+.feature-description {
+    color: #6b7280;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
 }
 
-.btn-submit {
+.btn-feature {
     background: var(--primary-gradient);
     border: none;
-    padding: 1rem 2rem;
-    font-size: 1.1rem;
+    padding: 0.8rem 2rem;
+    font-size: 1rem;
     font-weight: 600;
-    border-radius: 12px;
+    border-radius: 10px;
     color: white;
     transition: all 0.3s ease;
-    box-shadow: var(--shadow-md);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    display: inline-block;
 }
 
-.btn-submit:hover {
+.btn-feature:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-lg);
+    color: white;
     background: linear-gradient(135deg, #7c93f5 0%, #8b5cb8 100%);
 }
 
-.btn-submit:active {
-    transform: translateY(0);
-}
-
-.alert-custom {
-    border-radius: 12px;
-    border: none;
-    padding: 1rem 1.5rem;
-    margin-bottom: 2rem;
-    font-weight: 500;
-    box-shadow: var(--shadow-sm);
-    animation: slideDown 0.3s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.footer-custom {
+/* CTA Section */
+.cta-section {
+    padding: 5rem 0;
     text-align: center;
-    padding: 2rem 0 1rem 0;
     color: white;
+}
+
+.cta-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 20px;
+    padding: 3rem;
+    box-shadow: var(--shadow-xl);
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.cta-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.cta-buttons {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    flex-wrap: wrap;
     margin-top: 2rem;
 }
 
-.footer-custom p {
-    margin: 0.5rem 0;
-    opacity: 0.9;
+.btn-cta {
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-md);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+}
+
+.btn-cta-primary {
+    background: white;
+    color: #667eea;
+}
+
+.btn-cta-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    color: #667eea;
+}
+
+.btn-cta-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 2px solid white;
+}
+
+.btn-cta-secondary:hover {
+    background: white;
+    color: #667eea;
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Footer */
+.footer-custom {
+    background: rgba(0, 0, 0, 0.2);
+    color: white;
+    padding: 3rem 0 1.5rem 0;
+    margin-top: 4rem;
+}
+
+.footer-content {
+    text-align: center;
 }
 
 .footer-links {
     display: flex;
     gap: 2rem;
     justify-content: center;
-    margin-top: 1rem;
+    margin: 1.5rem 0;
+    flex-wrap: wrap;
 }
 
 .footer-links a {
@@ -331,242 +325,272 @@ body {
     opacity: 0.8;
 }
 
-.required-asterisk {
-    color: #ef4444;
-    margin-left: 2px;
+.footer-bottom {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    opacity: 0.8;
 }
 
-.input-group-text {
-    background: #f3f4f6;
-    border: 2px solid #e5e7eb;
-    border-right: none;
-    border-radius: 10px 0 0 10px;
-}
-
-.input-group .form-control {
-    border-left: none;
-    border-radius: 0 10px 10px 0;
-}
-
-.input-group:focus-within .input-group-text {
-    border-color: #667eea;
-    background: white;
-}
-
+/* Responsive */
 @media (max-width: 768px) {
-    .card-body-custom {
-        padding: 1.5rem 1rem;
+    .hero-title {
+        font-size: 2.5rem;
     }
     
-    .card-header-custom {
-        padding: 2rem 1rem;
+    .hero-subtitle {
+        font-size: 1.1rem;
     }
     
-    .form-section-title {
-        font-size: 1rem;
+    .feature-card {
+        margin-bottom: 2rem;
+    }
+    
+    .cta-title {
+        font-size: 2rem;
+    }
+    
+    .cta-buttons {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn-cta {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
     }
 }
 
-.tooltip-icon {
-    color: #9ca3af;
-    font-size: 0.85rem;
-    cursor: help;
-    margin-left: 0.3rem;
+/* Stats Section */
+.stats-section {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 3rem 0;
+    margin: 3rem 0;
+}
+
+.stat-item {
+    text-align: center;
+    color: white;
+    padding: 1.5rem;
+}
+
+.stat-number {
+    font-size: 3rem;
+    font-weight: 800;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    font-size: 1.1rem;
+    opacity: 0.9;
 }
 </style>
 </head>
 <body>
-<div class="registration-container">
-    <div class="card-custom">
-        <div class="card-header-custom">
-            <h2><i class="fas fa-user-plus"></i> User Registration</h2>
-            <p>Create your account to get started</p>
-            <div class="nav-links">
+
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-custom">
+    <div class="container">
+        <a class="navbar-brand" href="#"><i class="fas fa-graduation-cap"></i> Exam Portal</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <a class="nav-link-custom active" href="#"><i class="fas fa-home"></i> Home</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="exam1.php"><i class="fas fa-file-alt"></i> Exam-1</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="exam2.php"><i class="fas fa-clipboard-list"></i> Exam-2</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="register.php"><i class="fas fa-user-plus"></i> Register</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="login.php"><i class="fas fa-sign-in-alt"></i> Login</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link-custom" href="admin.php"><i class="fas fa-user-shield"></i> Admin</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <div class="hero-icon">
+            <i class="fas fa-graduation-cap"></i>
+        </div>
+        <h1 class="hero-title">Welcome to Exam Portal</h1>
+        <p class="hero-subtitle">Your comprehensive online examination system. Take exams, track your progress, and achieve academic excellence all in one place.</p>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fas fa-users"></i> 2,500+</span>
+                    <span class="stat-label">Active Students</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fas fa-file-alt"></i> 150+</span>
+                    <span class="stat-label">Exams Available</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fas fa-chart-line"></i> 95%</span>
+                    <span class="stat-label">Success Rate</span>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="stat-item">
+                    <span class="stat-number"><i class="fas fa-clock"></i> 24/7</span>
+                    <span class="stat-label">Access</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </div>
+                    <h3 class="feature-title">Exam-1</h3>
+                    <p class="feature-description">Take your first examination with comprehensive questions covering all course materials. Get instant results and detailed feedback.</p>
+                    <a href="exam1.php" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> Start Exam-1
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                    <h3 class="feature-title">Exam-2</h3>
+                    <p class="feature-description">Continue your assessment journey with advanced level questions. Test your knowledge and improve your skills.</p>
+                    <a href="exam2.php" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> Start Exam-2
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h3 class="feature-title">Register</h3>
+                    <p class="feature-description">Create your account to access all exams and track your progress. Quick and easy registration process.</p>
+                    <a href="register.php" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> Sign Up Now
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-sign-in-alt"></i>
+                    </div>
+                    <h3 class="feature-title">Login</h3>
+                    <p class="feature-description">Already have an account? Login to access your dashboard, view results, and continue your examination journey.</p>
+                    <a href="login.php" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> Login Here
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <h3 class="feature-title">Admin Panel</h3>
+                    <p class="feature-description">Administrative access for managing exams, users, and viewing comprehensive reports and analytics.</p>
+                    <a href="admin.php" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> Admin Access
+                    </a>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3 class="feature-title">Track Progress</h3>
+                    <p class="feature-description">Monitor your performance with detailed analytics, scores, and personalized recommendations for improvement.</p>
+                    <a href="#" class="btn-feature">
+                        <i class="fas fa-arrow-right"></i> View Progress
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section">
+    <div class="container">
+        <div class="cta-card">
+            <h2 class="cta-title">Ready to Get Started?</h2>
+            <p style="font-size: 1.2rem; margin-bottom: 0;">Join thousands of students already using our platform to excel in their examinations.</p>
+            <div class="cta-buttons">
+                <a href="register.php" class="btn-cta btn-cta-primary">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </a>
+                <a href="login.php" class="btn-cta btn-cta-secondary">
+                    <i class="fas fa-sign-in-alt"></i> Login Now
+                </a>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer-custom">
+    <div class="container">
+        <div class="footer-content">
+            <h4><i class="fas fa-graduation-cap"></i> Exam Portal</h4>
+            <p>Your trusted partner in online examination and assessment</p>
+            
+            <div class="footer-links">
+                <a href="#"><i class="fas fa-home"></i> Home</a>
+                <a href="exam1.php"><i class="fas fa-file-alt"></i> Exam-1</a>
+                <a href="exam2.php"><i class="fas fa-clipboard-list"></i> Exam-2</a>
+                <a href="register.php"><i class="fas fa-user-plus"></i> Register</a>
                 <a href="login.php"><i class="fas fa-sign-in-alt"></i> Login</a>
                 <a href="admin.php"><i class="fas fa-user-shield"></i> Admin</a>
             </div>
-        </div>
-
-        <div class="card-body-custom">
-            <?php if($message): ?>
-                <div class="alert alert-<?= $message_type ?> alert-custom alert-dismissible fade show" role="alert">
-                    <i class="fas fa-<?= $message_type === 'success' ? 'check-circle' : ($message_type === 'danger' ? 'exclamation-circle' : 'exclamation-triangle') ?>"></i>
-                    <?= $message ?>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <?php endif; ?>
-
-            <form method="POST" action="" class="row g-3">
-                <!-- Personal Information Section -->
-                <div class="col-12">
-                    <div class="form-section-title">
-                        <i class="fas fa-user"></i> Personal Information
-                    </div>
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">
-                        <i class="fas fa-id-badge"></i> First Name<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="text" name="firstname" class="form-control" required value="<?= $fields['firstname'] ?>" placeholder="Enter first name">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">
-                        <i class="fas fa-id-badge"></i> Middle Name
-                    </label>
-                    <input type="text" name="middlename" class="form-control" value="<?= $fields['middlename'] ?>" placeholder="Enter middle name">
-                </div>
-
-                <div class="col-md-4">
-                    <label class="form-label">
-                        <i class="fas fa-id-badge"></i> Last Name<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="text" name="lastname" class="form-control" required value="<?= $fields['lastname'] ?>" placeholder="Enter last name">
-                </div>
-
-                <!-- Contact Information Section -->
-                <div class="col-12">
-                    <div class="form-section-title">
-                        <i class="fas fa-address-book"></i> Contact Information
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-envelope"></i> Email Address<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="email" name="email" class="form-control" required value="<?= $fields['email'] ?>" placeholder="your.email@example.com">
-                    <small class="text-muted">Must be unique</small>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-phone"></i> Phone Number
-                    </label>
-                    <input type="text" name="phone" class="form-control" value="<?= $fields['phone'] ?>" placeholder="+234 XXX XXX XXXX">
-                </div>
-
-                <!-- Security Information Section -->
-                <div class="col-12">
-                    <div class="form-section-title">
-                        <i class="fas fa-lock"></i> Security Information
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-key"></i> Password<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="password" name="password" class="form-control" required placeholder="Min 6 characters">
-                    <small class="text-muted">Minimum 6 characters</small>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-key"></i> Confirm Password<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="password" name="confirm_password" class="form-control" required placeholder="Re-enter password">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-fingerprint"></i> ID Number<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="text" name="idnumber" class="form-control" required maxlength="11" value="<?= $fields['idnumber'] ?>" placeholder="Enter ID number">
-                    <small class="text-muted">Max 11 digits, numeric only</small>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-fingerprint"></i> Confirm ID Number<span class="required-asterisk">*</span>
-                    </label>
-                    <input type="text" name="confirm_id" class="form-control" required maxlength="11" value="<?= $fields['confirm_id'] ?>" placeholder="Re-enter ID number">
-                </div>
-
-                <!-- Academic Information Section -->
-                <div class="col-12">
-                    <div class="form-section-title">
-                        <i class="fas fa-graduation-cap"></i> Academic Information
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-building"></i> Department<span class="required-asterisk">*</span>
-                    </label>
-                    <select name="department" class="form-select" required>
-                        <option value="">-- Select Department --</option>
-                        <?php
-                        $departments = ["Business", "Nursing", "Law", "Engineering"];
-                        foreach ($departments as $d) {
-                            $selected = ($fields['department'] == $d) ? "selected" : "";
-                            echo "<option value='$d' $selected>$d</option>";
-                        }
-                        ?>
-                    </select>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-university"></i> Institution<span class="required-asterisk">*</span>
-                    </label>
-                    <select name="institution" class="form-select" required>
-                        <option value="">-- Select Institution --</option>
-                        <?php
-                        $institutions = ["Science", "Management", "Technology", "Arts"];
-                        foreach ($institutions as $i) {
-                            $selected = ($fields['institution'] == $i) ? "selected" : "";
-                            echo "<option value='$i' $selected>$i</option>";
-                        }
-                        ?>
-                    </select>
-                </div>
-
-                <!-- Additional Information Section -->
-                <div class="col-12">
-                    <div class="form-section-title">
-                        <i class="fas fa-info-circle"></i> Additional Information
-                    </div>
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-user-tag"></i> Username
-                    </label>
-                    <input type="text" name="username" class="form-control" value="<?= $fields['username'] ?>" placeholder="Choose a username">
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label">
-                        <i class="fas fa-shield-alt"></i> Secret Code
-                    </label>
-                    <input type="text" name="secret" class="form-control" value="<?= $fields['secret'] ?>" placeholder="Optional secret code">
-                </div>
-
-                <div class="col-12 text-center mt-4">
-                    <button type="submit" class="btn btn-submit w-100">
-                        <i class="fas fa-user-check"></i> Create Account
-                    </button>
-                </div>
-
-                <div class="col-12 text-center mt-3">
-                    <small class="text-muted">
-                        <span class="required-asterisk">*</span> Required fields
-                    </small>
-                </div>
-            </form>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2024 Exam Portal. All rights reserved.</p>
+            </div>
         </div>
     </div>
-
-    <div class="footer-custom">
-        <p>&copy; <?= date('Y'); ?> - User Registration System</p>
-        <div class="footer-links">
-            <a href="login.php"><i class="fas fa-sign-in-alt"></i> Login</a>
-            <a href="admin.php"><i class="fas fa-user-shield"></i> Admin Panel</a>
-        </div>
-    </div>
-</div>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
